@@ -21,6 +21,7 @@ def get_sorted_filenames(args):
     date_filenames = []
     for fn in filenames:
 	fn_date = fn.split('/')[-1].split('.')[1] 
+	# Ignore all files with 'h' in pos 2 (like create_climatology_nc).
 	if fn_date[2] == 'h':
 	    continue
 	date = dt.datetime(2000 + m[fn_date[2]] * 10 + int(fn_date[3]), months[fn_date[-3:]], 1)
@@ -30,6 +31,32 @@ def get_sorted_filenames(args):
 
 def weighted_average(data, weights):
     return (data * weights).sum() / weights.sum()
+
+def load_data(args, vars):
+    fns = get_sorted_filenames(args)
+    scenario_data = {}
+    for var in vars:
+	scenario_data[var] = []
+
+    for fn in fns:
+	#print(fn)
+	ds = nc.Dataset(fn)
+	for var in vars:
+	    scenario_data[var].append(ds.variables[var][0, 0])
+	ds.close()
+
+    for var in vars:
+	scenario_data[var] = np.array(scenario_data[var])
+
+    return scenario_data
+
+def load_all_data(args, vars):
+    data = {}
+    for scenario in DIRS.keys():
+	args.scenario = scenario
+	#print('Load scenario: %s'%scenario)
+	data[scenario] = load_data(args, vars)
+    return data
 
 def calc_time_series(args, variables):
     fns = get_sorted_filenames(args)
@@ -112,8 +139,8 @@ def main(args):
 
     if args.output:
         # min/maxes
-        print('ctrl-mean: %f'%(weighted_average(co2_2x_st, aavg_weight_edge)))
-        print('co2-mean: %f'%(weighted_average(control_st, aavg_weight_edge)))
+        print('ctrl-mean: %f'%(weighted_average(control_st, aavg_weight_edge)))
+        print('co2-mean: %f'%(weighted_average(co2_2x_st, aavg_weight_edge)))
         print('1%%-mean: %f'%(weighted_average(one_pct_2x_st, aavg_weight_edge)))
 
         print('co2-ctrl min max: %f, %f'%(co2_2x_diff.min(), co2_2x_diff.max()))
@@ -129,13 +156,27 @@ def main(args):
         print('G_1%%: %f'%(G_1pct))
         print('alpha, clim sens (CO2): %f, %f'%(alpha, clim_sensitivity_co2))
 
+    if args.method2:
+	method2(args, aavg_weight_edge)
+
     return control_dataset
+
+def method2(args, aavg_weight_edge):
+    all_data = load_all_data(args, ('surf_temp', 'toa_swdown', 'toa_swup', 'olr'))
+    for scenario in DIRS.keys():
+	surf_temp_mean = weighted_average(all_data[scenario]['surf_temp'].mean(axis=0), aavg_weight_edge)
+	toa = all_data[scenario]['toa_swdown'] - all_data[scenario]['toa_swup'] - all_data[scenario]['olr']  
+	toa_mean = weighted_average(toa.mean(axis=0), aavg_weight_edge)
+	print('Scenario: %s'%scenario)
+	print('  mean surf temp: %f'%surf_temp_mean)
+	print('  mean toa: %f'%toa_mean)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Simple Climate Modelling Analysis')
     parser.add_argument('-p','--plot', help='Plot figures', action='store_true')
     parser.add_argument('-o','--output', help='Output results', action='store_true')
+    parser.add_argument('-m','--method2', help='Use 2nd method', action='store_true')
     parser.add_argument('-d','--data-dir', help='Data directory', default='data')
     parser.add_argument('-s','--scenario', help='Scenario', default='all')
     args = parser.parse_args()
