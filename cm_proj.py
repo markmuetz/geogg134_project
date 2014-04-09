@@ -140,20 +140,22 @@ def main(args):
     if args.output:
         # min/maxes
         print('ctrl-mean: %f'%(weighted_average(control_st, aavg_weight_edge)))
-        print('co2-mean: %f'%(weighted_average(co2_2x_st, aavg_weight_edge)))
-        print('1%%-mean: %f'%(weighted_average(one_pct_2x_st, aavg_weight_edge)))
+        print('ctrl TOA global mean: %f'%(ctrl_toa_gm))
 
-        print('co2-ctrl min max: %f, %f'%(co2_2x_diff.min(), co2_2x_diff.max()))
+        print('1%%-mean: %f'%(weighted_average(one_pct_2x_st, aavg_weight_edge)))
         print('1%%-ctrl min max: %f, %f'%(one_pct_2x_diff.min(), one_pct_2x_diff.max()))
+
+        print('co2-mean: %f'%(weighted_average(co2_2x_st, aavg_weight_edge)))
+        print('co2-ctrl min max: %f, %f'%(co2_2x_diff.min(), co2_2x_diff.max()))
 
         print('co2-ctrl global mean: %f'%(weighted_average(co2_2x_diff, aavg_weight_edge)))
         print('TCR: 1%%-ctrl global mean: %f'%(tcr))
 
-        print('ctrl TOA global mean: %f'%(ctrl_toa_gm))
-        print('co2_2x TOA global mean: %f'%(co2_2x_toa_gm))
         print('one_pct_2x TOA global mean: %f'%(one_pct_2x_toa_gm))
-        print('G_2xCO2: %f'%(G_2xCO2))
+        print('co2_2x TOA global mean: %f'%(co2_2x_toa_gm))
+
         print('G_1%%: %f'%(G_1pct))
+        print('G_2xCO2: %f'%(G_2xCO2))
         print('alpha, clim sens (CO2): %f, %f'%(alpha, clim_sensitivity_co2))
 
     if args.method2:
