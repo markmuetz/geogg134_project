@@ -60,7 +60,7 @@ def plot_on_earth(lons, lats, data, vmin=-4, vmax=12):
     m.drawparallels(np.arange(-90.,90.,45.), labels=[1, 0, 0, 0], fontsize=10)
     m.drawmeridians(np.arange(-180.,180.,60.), labels=[0, 0, 0, 1], fontsize=10)
 
-    plt.colorbar()
+    m.colorbar(location='bottom', pad='7%')
     plt.show()
 
 def plot_south_america(lons, lats, seamask, data, vmin=0, vmax=6):
@@ -82,6 +82,6 @@ def plot_south_america(lons, lats, seamask, data, vmin=0, vmax=6):
     m.drawparallels(np.arange(-60.,15.,10.), labels=[1, 0, 0, 0], fontsize=10)
     m.drawmeridians(np.arange(-90.,-30.,10.), labels=[0, 0, 0, 1], fontsize=10)
 
-    plt.colorbar()
+    m.colorbar(location='right', pad='5%')
     plt.show()
 

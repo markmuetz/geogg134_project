@@ -5,18 +5,17 @@ from glob import glob
 import numpy as np
 import netCDF4 as nc
 
-DIRS = {#'mine': '../xjksa/datam/netcdf/*.nc',
-        'sstonly': '/home/ucfaohx/DATA/xjksb/datam/netcdf/*.nc',
-        'sstonly': '/home/ucfaohx/DATA/xjksb/datam/netcdf/*.nc',
-	'control': '/home/ucfanea/DATA/xjksc/datam/netcdf/*.nc',
-	'1%':      '/home/ucfahub/DATA/xjksd/datam/netcdf/*.nc',
-	'2x_co2':  '/data/geospatial_23/geogg134/um_output/double-co2/netcdf/*.nc'}
+SCENARIOS = {#'mine': '../xjksa/datam/netcdf/*.nc',
+             #'ssto': '/home/ucfaohx/DATA/xjksb/datam/netcdf/*.nc',
+             'ctrl': '/home/ucfanea/DATA/xjksc/datam/netcdf/*.nc',
+             '1pct': '/home/ucfahub/DATA/xjksd/datam/netcdf/*.nc',
+             '2co2': '/data/geospatial_23/geogg134/um_output/double-co2/netcdf/*.nc'}
 
 def get_sorted_filenames(args):
     data_dir = args.data_dir
     m = {'h': 0, 'i': 1, 'j': 2}
     months = dict((v.lower(),k) for k,v in enumerate(calendar.month_abbr))
-    filenames = glob(DIRS[args.scenario])
+    filenames = glob(SCENARIOS[args.scenario])
 
     date_filenames = []
     for fn in filenames:
@@ -52,7 +51,7 @@ def load_data(args, vars):
 
 def load_all_data(args, vars):
     data = {}
-    for scenario in DIRS.keys():
+    for scenario in SCENARIOS.keys():
 	args.scenario = scenario
 	#print('Load scenario: %s'%scenario)
 	data[scenario] = load_data(args, vars)
@@ -74,114 +73,145 @@ def calc_time_series(args, variables):
 
 def all_time_series(args):
     data = {}
-    for scenario in DIRS.keys():
+    for scenario in SCENARIOS.keys():
 	args.scenario = scenario
 	vars = ['surf_temp', 'toa_swdown', 'toa_swup', 'olr']
 	data[scenario] = calc_time_series(args, vars)
     return data
 
+def regional_comparison_sa(args):
+    Pass
 
-def main(args):
+def load_all_vars_datasets(args):
     data_dir = args.data_dir
+    ds = {}
 
     # Load NetCDF datasets.
-    control_dataset    = nc.Dataset('%s/climas/xjksc/xjksc_ANN_mean_allvars.nc'%(data_dir))
-    co2_2x_dataset     = nc.Dataset('%s/climas/co2_2x/co2_2x_ANN_mean_allvars.nc'%(data_dir))
-    one_pct_2x_dataset = nc.Dataset('%s/climas/xjksd/xjksd_ANN_mean_allvars.nc'%(data_dir))
+    ds['ctrl'] = nc.Dataset('%s/climas/xjksc/xjksc_ANN_mean_allvars.nc'%(data_dir))
+    ds['2co2'] = nc.Dataset('%s/climas/co2_2x/co2_2x_ANN_mean_allvars.nc'%(data_dir))
+    ds['1pct'] = nc.Dataset('%s/climas/xjksd/xjksd_ANN_mean_allvars.nc'%(data_dir))
 
     # Store the average weight (edge).
-    aavg_weight_edge = control_dataset.variables['aavg_weight_edge'][:, :]
+    ds['avg'] = ds['ctrl'].variables['aavg_weight_edge'][:, :]
 
-    # Get the control, 2xCO2 and 1%-2xCO2 surface temperatures.
-    control_st = control_dataset.variables['surf_temp'][0, 0]
-    co2_2x_st = co2_2x_dataset.variables['surf_temp'][0, 0]
-    one_pct_2x_st = one_pct_2x_dataset.variables['surf_temp'][0, 0]
+    return ds
+
+def primary_analysis(args):
+    ds = load_all_vars_datasets(args)
+
+    sts = {}
+    st_diffs = {}
+    toa_net_flux = {}
+    toa_gm = {}
+    G = {}
+
+    for scenario in SCENARIOS.keys():
+        # Get the control, 2co2 and 1%-2co2 surface temperatures.
+        sts[scenario] = ds[scenario].variables['surf_temp'][0, 0]
+
+        # Calc Top Of Atm net fluxes (incoming solar - outgoing solar - outgoing longwave).
+        toa_net_flux[scenario] = ds[scenario].variables['toa_swdown'][0, 0] -\
+                                 ds[scenario].variables['toa_swup'][0, 0] -\
+                                 ds[scenario].variables['olr'][0, 0]
+
+        # Calc some global means using a weighted average (Note calculation).
+        toa_gm[scenario] = weighted_average(toa_net_flux[scenario], ds['avg'])
 
     # Work out some differences.
-    co2_2x_diff = co2_2x_st - control_st
-    one_pct_2x_diff = one_pct_2x_st - control_st
+    st_diffs['2co2'] = sts['2co2'] - sts['ctrl']
+    st_diffs['1pct'] = sts['1pct'] - sts['ctrl']
 
-    # weighted avg. Note how calc is done.
-    tcr = (one_pct_2x_diff * aavg_weight_edge).sum() / aavg_weight_edge.sum()
+    tcr = weighted_average(st_diffs['1pct'], ds['avg'])
 
-    # Calc Top Of Atm net fluxes (incoming solar - outgoing solar - outgoing longwave).
-    control_toa_net_flux = control_dataset.variables['toa_swdown'][0, 0] -\
-                           control_dataset.variables['toa_swup'][0, 0] -\
-                           control_dataset.variables['olr'][0, 0]
-
-    co2_2x_toa_net_flux = co2_2x_dataset.variables['toa_swdown'][0, 0] -\
-                          co2_2x_dataset.variables['toa_swup'][0, 0] -\
-                          co2_2x_dataset.variables['olr'][0, 0]
-
-    one_pct_2x_toa_net_flux = one_pct_2x_dataset.variables['toa_swdown'][0, 0] -\
-                          one_pct_2x_dataset.variables['toa_swup'][0, 0] -\
-                          one_pct_2x_dataset.variables['olr'][0, 0]
-
-    toa_net_flux_diff = co2_2x_toa_net_flux - control_toa_net_flux
-
-    # Calc some global means using a weighted average (Note calculation).
-
-    ctrl_toa_gm = weighted_average(control_toa_net_flux, aavg_weight_edge)
-    co2_2x_toa_gm = weighted_average(co2_2x_toa_net_flux, aavg_weight_edge)
-    one_pct_2x_toa_gm = weighted_average(one_pct_2x_toa_net_flux, aavg_weight_edge)
-
-    G_2xCO2 = co2_2x_toa_gm - ctrl_toa_gm
-    G_1pct  = one_pct_2x_toa_gm - ctrl_toa_gm
+    G['2co2']  = toa_gm['2co2'] - toa_gm['ctrl']
+    G['1pct']  = toa_gm['1pct'] - toa_gm['ctrl']
 
     # Work out alpha (climate feedback param) and climate sensitivity.
-    alpha = (G_2xCO2 - G_1pct) / tcr
-    clim_sensitivity_co2 = G_2xCO2 / alpha
+    alpha = (G['2co2'] - G['1pct']) / tcr
+    clim_sens = G['2co2'] / alpha
 
     # Plot on nice overlays. Note this WILL NOT work on UCL computers.
     if args.plot:
         from plotting import plot_all
-        plot_all(control_dataset, one_pct_2x_diff, co2_2x_toa_net_flux)
+        plot_all(ds['ctrl'], st_diffs['1pct'], toa_net_flux['2co2'])
+
+    res = {'ds': ds,
+           'sts': sts,
+           'toa_net_flux': toa_net_flux,
+           'toa_gm': toa_gm,
+           'st_diffs': st_diffs,
+           'tcr': tcr,
+           'G': G,
+           'alpha': alpha,
+           'clim_sens': clim_sens}
 
     if args.output:
-        # min/maxes
-        print('ctrl-mean: %f'%(weighted_average(control_st, aavg_weight_edge)))
-        print('ctrl TOA global mean: %f'%(ctrl_toa_gm))
+        print_res(res)
 
-        print('1%%-mean: %f'%(weighted_average(one_pct_2x_st, aavg_weight_edge)))
-        print('1%%-ctrl min max: %f, %f'%(one_pct_2x_diff.min(), one_pct_2x_diff.max()))
+    return res
 
-        print('co2-mean: %f'%(weighted_average(co2_2x_st, aavg_weight_edge)))
-        print('co2-ctrl min max: %f, %f'%(co2_2x_diff.min(), co2_2x_diff.max()))
+def print_res(res):
+    ds = res['ds']
+    sts = res['sts']
+    st_diffs = res['st_diffs']
+    tcr = res['tcr']
+    toa_gm = res['toa_gm']
+    G = res['G']
+    alpha = res['alpha']
+    clim_sens = res['clim_sens']
 
-        print('co2-ctrl global mean: %f'%(weighted_average(co2_2x_diff, aavg_weight_edge)))
-        print('TCR: 1%%-ctrl global mean: %f'%(tcr))
+    # min/maxes
+    print('ctrl-mean: %f'%(weighted_average(sts['ctrl'], ds['avg'])))
+    print('ctrl TOA global mean: %f'%(toa_gm['ctrl']))
 
-        print('one_pct_2x TOA global mean: %f'%(one_pct_2x_toa_gm))
-        print('co2_2x TOA global mean: %f'%(co2_2x_toa_gm))
+    print('1%%-mean: %f'%(weighted_average(sts['1pct'], ds['avg'])))
+    print('1%%-ctrl min max: %f, %f'%(st_diffs['1pct'].min(), st_diffs['1pct'].max()))
 
-        print('G_1%%: %f'%(G_1pct))
-        print('G_2xCO2: %f'%(G_2xCO2))
-        print('alpha, clim sens (CO2): %f, %f'%(alpha, clim_sensitivity_co2))
+    print('co2-mean: %f'%(weighted_average(sts['2co2'], ds['avg'])))
+    print('co2-ctrl min max: %f, %f'%(st_diffs['2co2'].min(), st_diffs['2co2'].max()))
 
-    if args.method2:
-	method2(args, aavg_weight_edge)
+    print('co2-ctrl global mean: %f'%(weighted_average(st_diffs['2co2'], ds['avg'])))
+    print('TCR: 1%%-ctrl global mean: %f'%(tcr))
 
-    return control_dataset, one_pct_2x_diff
+    print('one_pct_2x TOA global mean: %f'%(toa_gm['1pct']))
+    print('co2_2x TOA global mean: %f'%(toa_gm['2co2']))
 
-def method2(args, aavg_weight_edge):
+    print('G_1pct: %f'%(G['1pct']))
+    print('G_2co2: %f'%(G['2co2']))
+    print('alpha, clim sens (CO2): %f, %f'%(alpha, clim_sens))
+
+
+def raw_data_analysis(args, aavg_weight_edge):
     all_data = load_all_data(args, ('surf_temp', 'toa_swdown', 'toa_swup', 'olr'))
-    for scenario in DIRS.keys():
-	surf_temp_mean = weighted_average(all_data[scenario]['surf_temp'].mean(axis=0), aavg_weight_edge)
-	toa = all_data[scenario]['toa_swdown'] - all_data[scenario]['toa_swup'] - all_data[scenario]['olr']  
-	toa_mean = weighted_average(toa.mean(axis=0), aavg_weight_edge)
+    res = {'all_data': all_data,
+           'st_mean': {},
+           'toa': {},
+           'toa_mean': {} }
+    for scenario in SCENARIOS.keys():
+	res['st_mean'][scenario] = weighted_average(all_data[scenario]['surf_temp'].mean(axis=0), aavg_weight_edge)
+	res['toa'][scenario] = all_data[scenario]['toa_swdown'] - all_data[scenario]['toa_swup'] - all_data[scenario]['olr']  
+	res['toa_mean'][scenario] = weighted_average(res['toa'][scenario].mean(axis=0), aavg_weight_edge)
 	print('Scenario: %s'%scenario)
-	print('  mean surf temp: %f'%surf_temp_mean)
-	print('  mean toa: %f'%toa_mean)
+	print('  mean surf temp: %f'%res['st_mean'])
+	print('  mean toa: %f'%res['toa_mean'])
+    return res
 
 def create_args():
     parser = argparse.ArgumentParser(description='Simple Climate Modelling Analysis')
     parser.add_argument('-p','--plot', help='Plot figures', action='store_true')
     parser.add_argument('-o','--output', help='Output results', action='store_true')
-    parser.add_argument('-m','--method2', help='Use 2nd method', action='store_true')
+    parser.add_argument('-r','--raw-data', help='Use 2nd method', action='store_true')
     parser.add_argument('-d','--data-dir', help='Data directory', default='data')
     parser.add_argument('-s','--scenario', help='Scenario', default='all')
     args = parser.parse_args()
     return args
+
+def main(args):
+    res = primary_analysis(args)
+
+    if args.raw_data:
+	res['raw'] = raw_data_analysis(args, res['ds']['avg'])
+    return res
 
 if __name__ == "__main__":
     args = create_args()
