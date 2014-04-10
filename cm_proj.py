@@ -101,11 +101,6 @@ def main(args):
     co2_2x_diff = co2_2x_st - control_st
     one_pct_2x_diff = one_pct_2x_st - control_st
 
-    # Plot on nice overlays. Note this WILL NOT work on UCL computers.
-    if args.plot:
-        from plotting import plot_on_earth
-        plot_on_earth(control_dataset, co2_2x_diff, one_pct_2x_diff)
-
     # weighted avg. Note how calc is done.
     tcr = (one_pct_2x_diff * aavg_weight_edge).sum() / aavg_weight_edge.sum()
 
@@ -137,6 +132,11 @@ def main(args):
     alpha = (G_2xCO2 - G_1pct) / tcr
     clim_sensitivity_co2 = G_2xCO2 / alpha
 
+    # Plot on nice overlays. Note this WILL NOT work on UCL computers.
+    if args.plot:
+        from plotting import plot_all
+        plot_all(control_dataset, one_pct_2x_diff, co2_2x_toa_net_flux)
+
     if args.output:
         # min/maxes
         print('ctrl-mean: %f'%(weighted_average(control_st, aavg_weight_edge)))
@@ -161,7 +161,7 @@ def main(args):
     if args.method2:
 	method2(args, aavg_weight_edge)
 
-    return control_dataset
+    return control_dataset, one_pct_2x_diff
 
 def method2(args, aavg_weight_edge):
     all_data = load_all_data(args, ('surf_temp', 'toa_swdown', 'toa_swup', 'olr'))
@@ -173,8 +173,7 @@ def method2(args, aavg_weight_edge):
 	print('  mean surf temp: %f'%surf_temp_mean)
 	print('  mean toa: %f'%toa_mean)
 
-
-if __name__ == "__main__":
+def create_args():
     parser = argparse.ArgumentParser(description='Simple Climate Modelling Analysis')
     parser.add_argument('-p','--plot', help='Plot figures', action='store_true')
     parser.add_argument('-o','--output', help='Output results', action='store_true')
@@ -182,4 +181,8 @@ if __name__ == "__main__":
     parser.add_argument('-d','--data-dir', help='Data directory', default='data')
     parser.add_argument('-s','--scenario', help='Scenario', default='all')
     args = parser.parse_args()
+    return args
+
+if __name__ == "__main__":
+    args = create_args()
     main(args)
