@@ -8,19 +8,25 @@ def get_vars_from_control_dataset(control_dataset):
     lons -= 3.75/2 # Corrections to allow for grid sizes. Not sure why these are nec.
     lats += 2.5/2
 
-    botmelt = control_dataset.variables['botmelt'][:] # contains a sea mask
-    seamask = botmelt.mask
+    return lons, lats
 
-    return lons, lats, seamask
+def general_plot(control_dataset, data, vmin, vmax, loc='global', sa_mask=None):
+    lons, lats = get_vars_from_control_dataset(control_dataset)
+    if loc == 'global':
+        plot_on_earth(lons, lats, data, vmin, vmax)
+    elif loc == 'sa':
+        plot_south_america(lons, lats, sa_mask, data, vmin, vmax)
 
-def plot_all(control_dataset, one_pct_2x_diff, co2_2x_toa_net_flux):
-    lons, lats, seamask = get_vars_from_control_dataset(control_dataset)
+def plot_all(control_dataset, one_pct_2x_diff, co2_2x_toa_net_flux, sa_mask, args):
+    lons, lats = get_vars_from_control_dataset(control_dataset)
 
-    plot_on_earth(lons, lats, one_pct_2x_diff)
-    plot_on_earth(lons, lats, co2_2x_toa_net_flux, -100, 100)
+    if args.plot_global:
+        plot_on_earth(lons, lats, one_pct_2x_diff)
+        plot_on_earth(lons, lats, co2_2x_toa_net_flux, -100, 100)
 
-    plot_south_america(lons, lats, seamask, one_pct_2x_diff)
-    plot_south_america(lons, lats, seamask, co2_2x_toa_net_flux, -100, 100)
+    if args.plot_local:
+        plot_south_america(lons, lats, sa_mask, one_pct_2x_diff)
+        plot_south_america(lons, lats, sa_mask, co2_2x_toa_net_flux, -100, 100)
 
 def extend_data(lons, lats, data):
     if False:
@@ -55,6 +61,7 @@ def plot_on_earth(lons, lats, data, vmin=-4, vmax=12):
     x, y = m(lons, lats)
 
     m.pcolormesh(x, y, plot_data, vmin=vmin, vmax=vmax)
+    #m.pcolormesh(x, y, plot_data)
 
     m.drawcoastlines()
     m.drawparallels(np.arange(-90.,90.,45.), labels=[1, 0, 0, 0], fontsize=10)
@@ -63,12 +70,8 @@ def plot_on_earth(lons, lats, data, vmin=-4, vmax=12):
     m.colorbar(location='bottom', pad='7%')
     plt.show()
 
-def plot_south_america(lons, lats, seamask, data, vmin=0, vmax=6):
-    # Create a mask just for South America.
-    sa_mask = np.zeros_like(data).astype(bool)
-    sa_mask[31:61, 74:89] = True
-
-    data_masked = np.ma.array(data, mask=~seamask | ~sa_mask)
+def plot_south_america(lons, lats, sa_mask, data, vmin=0, vmax=6):
+    data_masked = np.ma.array(data, mask=sa_mask)
     plot_lons, plot_data = extend_data(lons, lats, data_masked)
 
     lons, lats = np.meshgrid(plot_lons, lats)
@@ -77,6 +80,7 @@ def plot_south_america(lons, lats, seamask, data, vmin=0, vmax=6):
     x, y = m(lons, lats)
 
     m.pcolormesh(x, y, plot_data, vmin=vmin, vmax=vmax)
+    #m.pcolormesh(x, y, plot_data)
 
     m.drawcoastlines()
     m.drawparallels(np.arange(-60.,15.,10.), labels=[1, 0, 0, 0], fontsize=10)
