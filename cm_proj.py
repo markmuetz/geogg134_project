@@ -161,20 +161,16 @@ def print_res(res):
     clim_sens = res['clim_sens']
 
     # min/maxes
-    print('ctrl-mean: %f'%(weighted_average(sts['ctrl'], ds['avg'])))
-    print('ctrl TOA global mean: %f'%(toa_gm['ctrl']))
-
-    print('1%%-mean: %f'%(weighted_average(sts['1pct'], ds['avg'])))
     print('1%%-ctrl min max: %f, %f'%(st_diffs['1pct'].min(), st_diffs['1pct'].max()))
-
-    print('co2-mean: %f'%(weighted_average(sts['2co2'], ds['avg'])))
     print('co2-ctrl min max: %f, %f'%(st_diffs['2co2'].min(), st_diffs['2co2'].max()))
+
+    for scenario in SCENARIOS.keys():
+	print('Scenario: %s'%scenario)
+	print('  mean surf temp: %f'%(weighted_average(sts[scenario], ds['avg'])))
+	print('  mean toa: %f'%(toa_gm[scenario]))
 
     print('co2-ctrl global mean: %f'%(weighted_average(st_diffs['2co2'], ds['avg'])))
     print('TCR: 1%%-ctrl global mean: %f'%(tcr))
-
-    print('one_pct_2x TOA global mean: %f'%(toa_gm['1pct']))
-    print('co2_2x TOA global mean: %f'%(toa_gm['2co2']))
 
     print('G_1pct: %f'%(G['1pct']))
     print('G_2co2: %f'%(G['2co2']))
@@ -187,13 +183,19 @@ def raw_data_analysis(args, aavg_weight_edge):
            'st_mean': {},
            'toa': {},
            'toa_mean': {} }
+
     for scenario in SCENARIOS.keys():
-	res['st_mean'][scenario] = weighted_average(all_data[scenario]['surf_temp'].mean(axis=0), aavg_weight_edge)
-	res['toa'][scenario] = all_data[scenario]['toa_swdown'] - all_data[scenario]['toa_swup'] - all_data[scenario]['olr']  
+	res['st_mean'][scenario]  = weighted_average(all_data[scenario]['surf_temp'].mean(axis=0), aavg_weight_edge)
+	res['toa'][scenario]      = all_data[scenario]['toa_swdown'] -\
+		                    all_data[scenario]['toa_swup'] -\
+				    all_data[scenario]['olr']  
 	res['toa_mean'][scenario] = weighted_average(res['toa'][scenario].mean(axis=0), aavg_weight_edge)
+
+    for scenario in SCENARIOS.keys():
 	print('Scenario: %s'%scenario)
-	print('  mean surf temp: %f'%res['st_mean'])
-	print('  mean toa: %f'%res['toa_mean'])
+	print('  mean surf temp: %f'%res['st_mean'][scenario])
+	print('  mean toa: %f'%res['toa_mean'][scenario])
+
     return res
 
 def create_args():
