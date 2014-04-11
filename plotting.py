@@ -10,10 +10,19 @@ def get_vars_from_control_dataset(control_dataset):
 
     return lons, lats
 
+def vec_general_plot(control_dataset, x_data, y_data, loc='global', sa_mask=None):
+    lons, lats = get_vars_from_control_dataset(control_dataset)
+    if loc == 'global':
+        vec_plot_on_earth(lons, lats, x_data, y_data)
+    elif loc == 'sa':
+        vec_plot_south_america(lons, lats, sa_mask, x_data, y_data)
+
 def general_plot(control_dataset, data, vmin, vmax, loc='global', sa_mask=None):
     lons, lats = get_vars_from_control_dataset(control_dataset)
     if loc == 'global':
         plot_on_earth(lons, lats, data, vmin, vmax)
+    elif loc == 'polar':
+        plot_polar(lons, lats, sa_mask, data, vmin, vmax)
     elif loc == 'sa':
         plot_south_america(lons, lats, sa_mask, data, vmin, vmax)
 
@@ -69,6 +78,73 @@ def plot_on_earth(lons, lats, data, vmin=-4, vmax=12):
 
     m.colorbar(location='bottom', pad='7%')
     plt.show()
+
+def vec_plot_on_earth(lons, lats, x_data, y_data, vmin=-4, vmax=12):
+    plot_lons, plot_x_data = extend_data(lons, lats, x_data)
+    plot_lons, plot_y_data = extend_data(lons, lats, y_data)
+
+    lons, lats = np.meshgrid(plot_lons, lats)
+
+    m = Basemap(projection='cyl', resolution='c', llcrnrlat=-90, urcrnrlat=90, llcrnrlon=-180, urcrnrlon=180)
+    x, y = m(lons, lats)
+
+    mag = np.sqrt(plot_x_data**2 + plot_y_data**2)
+    vmin, vmax = mag.min(), mag.max()
+    m.pcolormesh(x, y, mag, vmin=vmin, vmax=vmax)
+    #m.quiver(x, y, plot_x_data, plot_y_data)
+    skip = 5
+    m.quiver(x[::skip, ::skip], y[::skip, ::skip], plot_x_data[::skip, ::skip], plot_y_data[::skip, ::skip])
+
+    m.drawcoastlines()
+    m.drawparallels(np.arange(-90.,90.,45.), labels=[1, 0, 0, 0], fontsize=10)
+    m.drawmeridians(np.arange(-180.,180.,60.), labels=[0, 0, 0, 1], fontsize=10)
+
+    m.colorbar(location='bottom', pad='7%')
+    plt.show()
+
+def vec_plot_south_america(lons, lats, sa_mask, data_x, data_y):
+    #print(sa_mask.shape)
+    #print(data_x.shape)
+    #print(data_y.shape)
+    #data_x_masked = np.ma.array(data_x, mask=sa_mask)
+    #data_y_masked = np.ma.array(data_y, mask=sa_mask)
+    plot_lons, plot_x_data = extend_data(lons, lats, data_x)
+    plot_lons, plot_y_data = extend_data(lons, lats, data_y)
+
+    lons, lats = np.meshgrid(plot_lons, lats)
+
+    m = Basemap(projection='cyl', resolution='c', llcrnrlat=-60, urcrnrlat=15, llcrnrlon=-85, urcrnrlon=-32)
+    x, y = m(lons, lats)
+
+    mag = np.sqrt(plot_x_data**2 + plot_y_data**2)
+    vmin, vmax = mag.min(), mag.max()
+    m.pcolormesh(x, y, mag, vmin=vmin, vmax=vmax)
+    m.quiver(x, y, plot_x_data, plot_y_data, scale=40)
+
+    m.drawcoastlines()
+    m.drawparallels(np.arange(-60.,15.,10.), labels=[1, 0, 0, 0], fontsize=10)
+    m.drawmeridians(np.arange(-90.,-30.,10.), labels=[0, 0, 0, 1], fontsize=10)
+
+    m.colorbar(location='right', pad='5%')
+    plt.show()
+
+def plot_polar(lons, lats, sa_mask, data, vmin=0, vmax=6):
+    plot_lons, plot_data = extend_data(lons, lats, data)
+
+    lons, lats = np.meshgrid(plot_lons, lats)
+
+    m = Basemap(resolution='c',projection='stere',lat_0=-90.,lon_0=0, width=12000000,height=8000000)
+    x, y = m(lons, lats)
+
+    m.pcolormesh(x, y, plot_data, vmin=vmin, vmax=vmax)
+
+    m.drawcoastlines()
+    m.drawparallels(np.arange(-60.,15.,10.), labels=[1, 0, 0, 0], fontsize=10)
+    m.drawmeridians(np.arange(-180.,180.,10.), fontsize=10)
+
+    m.colorbar(location='right', pad='5%')
+    plt.show()
+
 
 def plot_south_america(lons, lats, sa_mask, data, vmin=0, vmax=6):
     data_masked = np.ma.array(data, mask=sa_mask)

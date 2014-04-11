@@ -1,3 +1,5 @@
+from __future__ import print_function
+import inspect
 import calendar
 import datetime as dt
 import argparse
@@ -102,15 +104,32 @@ def create_sa_mask(ds):
     return ~seamask | ~rect_mask
 
 def regional_comparison_sa(args, ds, edge_aw):
+    parser = argparse.ArgumentParser(description='Run interactive plotter')
+    parser.add_argument('-g','--plot-global', help='Plot global figures', action='store_true', default=True)
+    parser.add_argument('-l','--plot-local', help='Plot local figures', action='store_true')
+    parser.add_argument('-d','--plot-diff', help='Plot diff', action='store_true')
+    parser.add_argument('-o','--plot-polar', help='Polar', action='store_true')
+    parser.add_argument('-s','--scen', help='Scenario')
+    parser.add_argument('-t','--sleep', help='Sleep time', default=0.1)
+    parser.add_argument('-p','--prev', help='Prev', action='store_true')
+    parser.add_argument('-n','--next', help='Next', action='store_true')
+    parser.add_argument('-v','--var', help='Variable')
+    parser.add_argument('-c','--vec_var', help='Vec variable')
+    parser.add_argument('-q','--quit', help='Quit', action='store_true')
+    parser.add_argument('-a','--again', help='Again', action='store_true')
+
     data_dir = args.data_dir
     reg_ds = {}
     reg_data = {}
 
     sa_mask = create_sa_mask(ds)
-    variables = ['surf_temp', 'precip', 'icedepth', 'field1389', 'low_cloud', 'med_cloud', 'high_cloud']
+    variables = ['surf_temp', 'precip', 'icedepth', 'snow', 'field1389', 'low_cloud', 'med_cloud', 'high_cloud',
+                 'surf_u', 'surf_v']
+    vec_variables = [('surf_u', 'surf_v')]
+    var_index = 0
 
     for scenario in MONTHLY_SCENARIOS.keys():
-        print(scenario)
+        print('Loading data for %s'%scenario)
         reg_ds[scenario] = {}
         reg_data[scenario] = {}
         for var in variables:
@@ -118,7 +137,7 @@ def regional_comparison_sa(args, ds, edge_aw):
 
         for month in MONTHS.keys():
             if month != '':
-                print(month)
+                print('  loading %s'%month)
                 reg_ds[scenario][month] = nc.Dataset(MONTHLY_SCENARIOS[scenario]%(data_dir, month))
                 for var in variables:
                     reg_data[scenario][var].append(reg_ds[scenario][month].variables[var][0, 0])
@@ -126,74 +145,125 @@ def regional_comparison_sa(args, ds, edge_aw):
         for var in variables:
             reg_data[scenario][var] = np.array(reg_data[scenario][var])
 
-    was = []
-    if args.plot_local or args.plot_global:
-        import plotting
-        plt.ion()
-        r = ''
-        while r != 'q':
-            for var in variables:
-                print(var)
-                r = raw_input()
+    import plotting
+    plt.ion()
+    r = ''
+    var = variables[0]
+    pargs = parser.parse_known_args([])[0]
+    pargs.scen = '1pct'
+    while True:
+        if var == '':
+            print('Input args: ', end='')
+        else:
+            print('Input args [%s:%s]: '%(pargs.scen, var), end='')
+        r = raw_input()
+        try:
+            pargs_new = parser.parse_known_args(r.split())[0]
+        except SystemExit:
+            continue
+        except:
+            print('Could not parse args (-q to quit).')
+            continue
 
-                if r == 'l':
-                    args.plot_local  = True
-                    args.plot_global = False
-                elif r == 'g':
-                    args.plot_local  = False
-                    args.plot_global = True
-                elif r == 'd':
-                    args.plot_diff  = True
-                elif r == 'n':
-                    args.plot_diff  = False
-                elif r == 's':
-                    continue
-                elif r == 'q':
-                    break
+        for field in dir(pargs):
+            print(field)
+            if not field.startswith('__') and getattr(pargs_new, field) != None:
+                print("setting %s to %s"%(field, str(getattr(pargs_new, field))))
+                setattr(pargs, field, getattr(pargs_new, field))
 
-                if args.plot_diff:
-                    diff = reg_data['1pct'][var] - reg_data['ctrl'][var]
-                    vmin, vmax = diff.min(), diff.max()
+        if pargs.quit:
+            break
 
-                for month in MONTHS.keys():
-                    if month == '':
-                        continue
-                    if args.plot_diff:
-                        if var == 'surf_temp':
-                            vmin, vmax = 0, 10
-                        elif var == 'precip':
-                            vmin, vmax = -10, 10
-                    else:
-                        if var == 'surf_temp':
-                            vmin, vmax = 230, 320
-                        elif var == 'precip':
-                            vmin, vmax = 0, 25
-                        elif var == 'icedepth':
-                            vmin, vmax = 0, 3
-                        elif var == 'field1389':
-                            vmin, vmax = -2e-8, 10e-8
-                        elif var in ('low_cloud', 'med_cloud', 'high_cloud'):
-                            vmin, vmax = 0, 1
+        if pargs.var != None:
+            var = pargs.var
 
-                    plt.clf()
-                    if not args.plot_diff:
-                        data = reg_data['1pct'][var][MONTHS[month] - 1]
-                    else:
-                        data = diff[MONTHS[month] - 1]
+        if pargs.vec_var != None:
+            pass
+        else:
+            if var not in variables:
+                print('%s not recognised'%var)
+                print(variables)
+                continue
+            elif pargs.next and var != '':
+                var = variables[variables.index(var) + 1 % len(variables)]
+            elif pargs.prev and var != '':
+                var = variables[variables.index(var) - 1 + len(variables) % len(variables)]
 
-                    if args.plot_global:
-                        plotting.general_plot(ds['ctrl'], data, vmin, vmax)
-                    elif args.plot_local:
-                        sa_mask = create_sa_mask(ds)
-                        plotting.general_plot(ds['ctrl'], data, vmin, vmax, 'sa', sa_mask)
+        if pargs.plot_local:
+            pargs.plot_global = False
+        if pargs.plot_polar:
+            pargs.plot_global = False
 
-                    plt.title('%s average for %s'%(month, var))
-                    plt.draw()
-                    time.sleep(float(args.sleep))
-                    was.append(weighted_average(reg_data['1pct']['surf_temp'][MONTHS[month] - 1], edge_aw))
+        print(var)
+        
+        if pargs.scen not in MONTHLY_SCENARIOS.keys():
+            print('%s not recognised'%pargs.scen)
+            print(MONTHLY_SCENARIOS.keys())
+            continue
+        scen = pargs.scen
+
+        if pargs.plot_diff:
+            diff = reg_data[scen][var] - reg_data['ctrl'][var]
+            vmin, vmax = diff.min(), diff.max()
+
+        for month in MONTHS.keys():
+            print(month)
+            if month == '':
+                continue
+            if pargs.plot_diff:
+                if var == 'surf_temp':
+                    vmin, vmax = 0, 10
+                elif var == 'precip':
+                    vmin, vmax = -10, 10
+            else:
+                if var == 'surf_temp':
+                    vmin, vmax = 230, 320
+                elif var == 'precip':
+                    vmin, vmax = 0, 25
+                elif var == 'icedepth':
+                    vmin, vmax = 0, 3
+                elif var == 'snow':
+                    vmin, vmax = 0, 3
+                elif var == 'field1389':
+                    vmin, vmax = -2e-8, 10e-8
+                elif var in ('low_cloud', 'med_cloud', 'high_cloud'):
+                    vmin, vmax = 0, 1
+
+            if pargs.vec_var != None:
+                data_x = reg_data[scen]['surf_u'][MONTHS[month] - 1]
+                data_y = reg_data[scen]['surf_v'][MONTHS[month] - 1]
+            else:
+                if not pargs.plot_diff:
+                    av_diff = 'average'
+                    data = reg_data[scen][var][MONTHS[month] - 1]
+                else:
+                    av_diff = 'diff (%s - ctrl)'%(scen)
+                    data = diff[MONTHS[month] - 1]
+
+            plt.clf()
+            if pargs.vec_var != None:
+                if pargs.plot_global:
+                    plotting.vec_general_plot(ds['ctrl'], data_x, data_y)
+                elif pargs.plot_local:
+                    sa_mask = create_sa_mask(ds)
+                    plotting.vec_general_plot(ds['ctrl'], data_x, data_y, 'sa', sa_mask)
+            else:
+                if pargs.plot_global:
+                    plt.title('%s Global %s %s for %s'%(scen, month, av_diff, var))
+                    #plt.imshow(data, interpolation='nearest', vmin=vmin, vmax=vmax)
+                    plotting.general_plot(ds['ctrl'], data, vmin, vmax)
+                elif pargs.plot_polar:
+                    plt.title('%s SA %s %s for %s'%(scen, month, av_diff, var))
+                    plotting.general_plot(ds['ctrl'], data, vmin, vmax, 'polar', sa_mask)
+                elif pargs.plot_local:
+                    plt.title('%s SA %s %s for %s'%(scen, month, av_diff, var))
+                    sa_mask = create_sa_mask(ds)
+                    plotting.general_plot(ds['ctrl'], data, vmin, vmax, 'sa', sa_mask)
+
+            plt.pause(float(pargs.sleep))
 
 
-        plt.close()
+    plt.close()
 
     return reg_ds, reg_data
 
@@ -325,7 +395,7 @@ def create_args():
     parser.add_argument('-e','--regional', help='Regional analysis', action='store_true')
     parser.add_argument('-d','--data-dir', help='Data directory', default='data')
     parser.add_argument('-s','--scenario', help='Scenario', default='all')
-    parser.add_argument('-p','--sleep', help='Sleep time', default='0.')
+    parser.add_argument('-p','--sleep', help='Sleep time', default='0.1')
     args = parser.parse_args()
     return args
 
