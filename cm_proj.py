@@ -168,7 +168,8 @@ def regional_comparison_sa(args, ds, edge_aw):
         for field in dir(pargs):
             print(field)
             if not field.startswith('__') and getattr(pargs_new, field) != None:
-                print("setting %s to %s"%(field, str(getattr(pargs_new, field))))
+                # Not working as intended yet, meant to just update things that aren't None.
+                #print("setting %s to %s"%(field, str(getattr(pargs_new, field))))
                 setattr(pargs, field, getattr(pargs_new, field))
 
         if pargs.quit:
