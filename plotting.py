@@ -10,19 +10,25 @@ def get_vars_from_control_dataset(control_dataset):
 
     return lons, lats
 
-def vec_general_plot(control_dataset, x_data, y_data, loc='global', sa_mask=None):
+def vec_general_plot(control_dataset, data_x, data_y, loc='global', sa_mask=None):
     lons, lats = get_vars_from_control_dataset(control_dataset)
     if loc == 'global':
-        vec_plot_on_earth(lons, lats, x_data, y_data)
+        vec_plot_on_earth(lons, lats, data_x, data_y)
+    elif loc == 'N':
+        vec_plot_polar(lons, lats, data_x, data_y, 'N')
+    elif loc == 'S':
+        vec_plot_polar(lons, lats, data_x, data_y, 'S')
     elif loc == 'sa':
-        vec_plot_south_america(lons, lats, sa_mask, x_data, y_data)
+        vec_plot_south_america(lons, lats, sa_mask, data_x, data_y)
 
 def general_plot(control_dataset, data, vmin, vmax, loc='global', sa_mask=None):
     lons, lats = get_vars_from_control_dataset(control_dataset)
     if loc == 'global':
         plot_on_earth(lons, lats, data, vmin, vmax)
-    elif loc == 'polar':
-        plot_polar(lons, lats, sa_mask, data, vmin, vmax)
+    elif loc == 'N':
+        plot_polar(lons, lats, sa_mask, data, vmin, vmax, 'N')
+    elif loc == 'S':
+        plot_polar(lons, lats, sa_mask, data, vmin, vmax, 'S')
     elif loc == 'sa':
         plot_south_america(lons, lats, sa_mask, data, vmin, vmax)
 
@@ -90,7 +96,8 @@ def vec_plot_on_earth(lons, lats, x_data, y_data, vmin=-4, vmax=12):
 
     mag = np.sqrt(plot_x_data**2 + plot_y_data**2)
     vmin, vmax = mag.min(), mag.max()
-    m.pcolormesh(x, y, mag, vmin=vmin, vmax=vmax)
+    m.contourf(x[:-1,:], y[:-1,:], mag)
+    #m.pcolormesh(x, y, mag, vmin=vmin, vmax=vmax)
     #m.quiver(x, y, plot_x_data, plot_y_data)
     skip = 5
     m.quiver(x[::skip, ::skip], y[::skip, ::skip], plot_x_data[::skip, ::skip], plot_y_data[::skip, ::skip])
@@ -118,7 +125,8 @@ def vec_plot_south_america(lons, lats, sa_mask, data_x, data_y):
 
     mag = np.sqrt(plot_x_data**2 + plot_y_data**2)
     vmin, vmax = mag.min(), mag.max()
-    m.pcolormesh(x, y, mag, vmin=vmin, vmax=vmax)
+    m.contourf(x[:-1,:], y[:-1,:], mag)
+    #m.pcolormesh(x, y, mag, vmin=vmin, vmax=vmax)
     m.quiver(x, y, plot_x_data, plot_y_data, scale=40)
 
     m.drawcoastlines()
@@ -128,12 +136,41 @@ def vec_plot_south_america(lons, lats, sa_mask, data_x, data_y):
     m.colorbar(location='right', pad='5%')
     plt.show()
 
-def plot_polar(lons, lats, sa_mask, data, vmin=0, vmax=6):
+def vec_plot_polar(lons, lats, data_x, data_y, pole):
+    plot_lons, plot_x_data = extend_data(lons, lats, data_x)
+    plot_lons, plot_y_data = extend_data(lons, lats, data_y)
+
+    lons, lats = np.meshgrid(plot_lons, lats)
+
+    if pole == 'N':
+	m = Basemap(resolution='c',projection='stere',lat_0=90.,lon_0=0, width=12000000,height=8000000)
+    elif pole == 'S':
+	m = Basemap(resolution='c',projection='stere',lat_0=-90.,lon_0=0, width=12000000,height=8000000)
+    x, y = m(lons, lats)
+
+    mag = np.sqrt(plot_x_data**2 + plot_y_data**2)
+    vmin, vmax = mag.min(), mag.max()
+    m.contourf(x[:-1,:], y[:-1,:], mag)
+    #m.pcolormesh(x, y, mag, vmin=vmin, vmax=vmax)
+    skip = 5
+    m.quiver(x[::5, ::5], y[::5, ::5], plot_x_data[::5, ::5], plot_y_data[::5, ::5], scale=50)
+
+    m.drawcoastlines()
+    m.drawparallels(np.arange(-60.,15.,10.), labels=[1, 0, 0, 0], fontsize=10)
+    m.drawmeridians(np.arange(-180.,180.,10.), fontsize=10)
+
+    m.colorbar(location='right', pad='5%')
+    plt.show()
+
+def plot_polar(lons, lats, sa_mask, data, vmin=0, vmax=6, pole='N'):
     plot_lons, plot_data = extend_data(lons, lats, data)
 
     lons, lats = np.meshgrid(plot_lons, lats)
 
-    m = Basemap(resolution='c',projection='stere',lat_0=-90.,lon_0=0, width=12000000,height=8000000)
+    if pole == 'N':
+	m = Basemap(resolution='c',projection='stere',lat_0=90.,lon_0=0, width=12000000,height=8000000)
+    elif pole == 'S':
+	m = Basemap(resolution='c',projection='stere',lat_0=-90.,lon_0=0, width=12000000,height=8000000)
     x, y = m(lons, lats)
 
     m.pcolormesh(x, y, plot_data, vmin=vmin, vmax=vmax)
