@@ -111,11 +111,15 @@ def regional_comparison_sa(args, ds, edge_aw):
     parser.add_argument('-d','--plot-diff', help='Plot diff', action='store_true')
     parser.add_argument('-o','--plot-polar', help='Polar')
     parser.add_argument('-s','--scen', help='Scenario')
-    parser.add_argument('-t','--sleep', help='Sleep time', default=0.1)
-    parser.add_argument('-p','--prev', help='Prev', action='store_true')
-    parser.add_argument('-n','--next', help='Next', action='store_true')
+    parser.add_argument('--sleep', help='Sleep time', default=0.1)
+    parser.add_argument('-t','--time-series', help='Time series', action='store_true')
+    #parser.add_argument('-p','--prev', help='Prev', action='store_true')
+    #parser.add_argument('-n','--next', help='Next', action='store_true')
+    parser.add_argument('-n','--new', help='New figure', action='store_true')
+    parser.add_argument('-c','--close', help='Close figure', action='store_true')
+
     parser.add_argument('-v','--var', help='Variable')
-    parser.add_argument('-c','--vec_var', help='Vec variable')
+    parser.add_argument('--vec_var', help='Vec variable')
     parser.add_argument('-q','--quit', help='Quit', action='store_true')
     parser.add_argument('-a','--again', help='Again', action='store_true')
     parser.add_argument('--vmin', help='vmin')
@@ -124,6 +128,8 @@ def regional_comparison_sa(args, ds, edge_aw):
     data_dir = args.data_dir
     reg_ds = {}
     reg_data = {}
+    reg_ts_data = {}
+    reg_lts_data = {}
 
     sa_mask = create_sa_mask(ds)
     if not args.use_all_variables:
@@ -139,6 +145,8 @@ def regional_comparison_sa(args, ds, edge_aw):
         print('Loading data for %s'%scenario)
         reg_ds[scenario] = {}
         reg_data[scenario] = {}
+        reg_ts_data[scenario] = {}
+        reg_lts_data[scenario] = {}
         if variables == None:
             first_ds = nc.Dataset(MONTHLY_SCENARIOS[scenario]%(data_dir, 'jan'))
             variables = first_ds.variables.keys()
@@ -146,6 +154,8 @@ def regional_comparison_sa(args, ds, edge_aw):
 
         for var in variables:
             reg_data[scenario][var] = []
+            reg_ts_data[scenario][var] = []
+            reg_lts_data[scenario][var] = []
 
         for month in MONTHS.keys():
             if month != '':
@@ -155,6 +165,8 @@ def regional_comparison_sa(args, ds, edge_aw):
                 for var in variables:
                     try:
                         reg_data[scenario][var].append(reg_ds[scenario][month].variables[var][0, 0])
+                        reg_ts_data[scenario][var].append(weighted_average(reg_ds[scenario][month].variables[var][0, 0], edge_aw))
+                        #reg_lts_data[scenario][var].append(weighted_average(reg_ds[scenario][month].variables[var][0, 0] & sa_mask, edge_aw))
                     except:
                         print('Could not load %s'%var)
                         variables.remove(var)
@@ -162,11 +174,13 @@ def regional_comparison_sa(args, ds, edge_aw):
 
         for var in variables:
             reg_data[scenario][var] = np.array(reg_data[scenario][var])
+            reg_ts_data[scenario][var] = np.array(reg_ts_data[scenario][var])
+            #reg_lts_data[scenario][var] = np.array(reg_lts_data[scenario][var])
 
     import plotting
     plt.ion()
 
-    var = variables[0]
+    var = 'surf_temp'
     vec_var = None
     scen = '1pct'
 
@@ -207,12 +221,13 @@ def regional_comparison_sa(args, ds, edge_aw):
                 var = pargs.var
                 continue
             else:
-                if pargs.next and var != '':
-                    var = variables[variables.index(var) + 1 % len(variables)]
-                    continue
-                elif pargs.prev and var != '':
-                    var = variables[variables.index(var) - 1 + len(variables) % len(variables)]
-                    continue
+                pass
+                #if pargs.next and var != '':
+                #    var = variables[variables.index(var) + 1 % len(variables)]
+                #    continue
+                #elif pargs.prev and var != '':
+                #    var = variables[variables.index(var) - 1 + len(variables) % len(variables)]
+                #    continue
 
         if pargs.scen:
             if pargs.scen not in MONTHLY_SCENARIOS.keys():
@@ -220,6 +235,31 @@ def regional_comparison_sa(args, ds, edge_aw):
                 print(MONTHLY_SCENARIOS.keys())
                 continue
             scen = pargs.scen
+            continue
+
+        if pargs.new:
+            plt.figure()
+
+        if pargs.close:
+            plt.close('all')
+            continue
+
+        if pargs.time_series:
+            plt.clf()
+            if pargs.plot_local:
+                if pargs.plot_diff:
+                    plt.title('Difference (%s - ctlr) for %s'%(scen, var))
+                    plt.plot(reg_lts_data[scen][var] - reg_lts_data['ctrl'][var])
+                else:
+                    plt.title('%s for %s'%(scen, var))
+                    plt.plot(reg_lts_data[scen][var])
+            else:
+                if pargs.plot_diff:
+                    plt.title('Difference (%s - ctlr) for %s'%(scen, var))
+                    plt.plot(reg_ts_data[scen][var] - reg_ts_data['ctrl'][var])
+                else:
+                    plt.title('%s for %s'%(scen, var))
+                    plt.plot(reg_ts_data[scen][var])
             continue
 
         if pargs.plot_local:
