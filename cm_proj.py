@@ -234,6 +234,20 @@ def regional_comparison_sa(args, ds, edge_aw):
         for month in MONTHS.keys():
             if month == '':
                 continue
+            if vec_var:
+                data_x = reg_data[scen]['%s_u'%var][MONTHS[month] - 1]
+                data_y = reg_data[scen]['%s_v'%var][MONTHS[month] - 1]
+                av_diff = 'average'
+            else:
+                if not pargs.plot_diff:
+                    av_diff = 'average'
+                    data = reg_data[scen][var][MONTHS[month] - 1]
+                else:
+                    av_diff = 'diff (%s - ctrl)'%(scen)
+                    data = diff[MONTHS[month] - 1]
+
+            if not pargs.plot_diff:
+                vmin, vmax = None, None
             if pargs.plot_diff:
                 if var == 'surf_temp':
                     vmin, vmax = 0, 10
@@ -252,22 +266,17 @@ def regional_comparison_sa(args, ds, edge_aw):
                     vmin, vmax = -2e-8, 10e-8
                 elif var in ('low_cloud', 'med_cloud', 'high_cloud'):
                     vmin, vmax = 0, 1
+
             if pargs.vmin:
                 vmin = pargs.vmin
             if pargs.vmax:
                 vmax = pargs.vmax
 
-            if vec_var:
-                data_x = reg_data[scen]['%s_u'%var][MONTHS[month] - 1]
-                data_y = reg_data[scen]['%s_v'%var][MONTHS[month] - 1]
-                av_diff = 'average'
-            else:
-                if not pargs.plot_diff:
-                    av_diff = 'average'
-                    data = reg_data[scen][var][MONTHS[month] - 1]
-                else:
-                    av_diff = 'diff (%s - ctrl)'%(scen)
-                    data = diff[MONTHS[month] - 1]
+            if vmin == None:
+                vmin = data.min()
+            if vmax == None:
+                vmax = data.max()
+
 
             plt.clf()
             if vec_var:
