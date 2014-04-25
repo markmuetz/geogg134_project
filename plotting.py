@@ -184,8 +184,12 @@ def plot_polar(lons, lats, sa_mask, data, vmin=0, vmax=6, pole='N'):
 
 
 def plot_south_america(lons, lats, sa_mask, data, vmin=0, vmax=6):
-    data_masked = np.ma.array(data, mask=sa_mask)
-    plot_lons, plot_data = extend_data(lons, lats, data_masked)
+    if sa_mask != None:
+	data_masked = np.ma.array(data, mask=sa_mask)
+	plot_lons, plot_data = extend_data(lons, lats, data_masked)
+    else:
+	data_masked = data
+	plot_lons, plot_data = extend_data(lons, lats, data_masked)
 
     lons, lats = np.meshgrid(plot_lons, lats)
 

@@ -115,15 +115,16 @@ def regional_comparison_sa(args, ds, edge_aw):
     parser.add_argument('-t','--time-series', help='Time series', action='store_true')
     #parser.add_argument('-p','--prev', help='Prev', action='store_true')
     #parser.add_argument('-n','--next', help='Next', action='store_true')
-    parser.add_argument('-n','--new', help='New figure', action='store_true')
+    parser.add_argument('-f','--figure', help='Use figure')
     parser.add_argument('-c','--close', help='Close figure', action='store_true')
 
     parser.add_argument('-v','--var', help='Variable')
     parser.add_argument('--vec_var', help='Vec variable')
     parser.add_argument('-q','--quit', help='Quit', action='store_true')
-    parser.add_argument('-a','--again', help='Again', action='store_true')
+    parser.add_argument('-a','--average', help='Average', action='store_true')
     parser.add_argument('--vmin', help='vmin')
     parser.add_argument('--vmax', help='vmax')
+    parser.add_argument('-m','--months', help='Months')
 
     data_dir = args.data_dir
     reg_ds = {}
@@ -166,16 +167,19 @@ def regional_comparison_sa(args, ds, edge_aw):
                     try:
                         reg_data[scenario][var].append(reg_ds[scenario][month].variables[var][0, 0])
                         reg_ts_data[scenario][var].append(weighted_average(reg_ds[scenario][month].variables[var][0, 0], edge_aw))
-                        #reg_lts_data[scenario][var].append(weighted_average(reg_ds[scenario][month].variables[var][0, 0] & sa_mask, edge_aw))
-                    except:
+                        masked_var = np.ma.masked_array(reg_ds[scenario][month].variables[var][0, 0], mask=sa_mask[0, 0])
+                        reg_lts_data[scenario][var].append(weighted_average(masked_var, edge_aw))
+                    except Exception, e:
                         print('Could not load %s'%var)
+                        print(e.message)
+                        #raise
                         variables.remove(var)
                         
 
         for var in variables:
             reg_data[scenario][var] = np.array(reg_data[scenario][var])
             reg_ts_data[scenario][var] = np.array(reg_ts_data[scenario][var])
-            #reg_lts_data[scenario][var] = np.array(reg_lts_data[scenario][var])
+            reg_lts_data[scenario][var] = np.array(reg_lts_data[scenario][var])
 
     import plotting
     plt.ion()
@@ -237,15 +241,15 @@ def regional_comparison_sa(args, ds, edge_aw):
             scen = pargs.scen
             continue
 
-        if pargs.new:
-            plt.figure()
+        if pargs.figure:
+            plt.figure(pargs.figure)
 
         if pargs.close:
             plt.close('all')
             continue
 
         if pargs.time_series:
-            plt.clf()
+            #plt.clf()
             if pargs.plot_local:
                 if pargs.plot_diff:
                     plt.title('Difference (%s - ctlr) for %s'%(scen, var))
@@ -271,79 +275,149 @@ def regional_comparison_sa(args, ds, edge_aw):
             diff = reg_data[scen][var] - reg_data['ctrl'][var]
             vmin, vmax = diff.min(), diff.max()
 
-        for month in MONTHS.keys():
-            if month == '':
-                continue
-            if vec_var:
-                data_x = reg_data[scen]['%s_u'%var][MONTHS[month] - 1]
-                data_y = reg_data[scen]['%s_v'%var][MONTHS[month] - 1]
-                av_diff = 'average'
-            else:
-                if not pargs.plot_diff:
+        if not pargs.plot_diff:
+            vmin, vmax = None, None
+        if pargs.plot_diff:
+            if var == 'surf_temp':
+                vmin, vmax = 0, 10
+            elif var == 'precip':
+                vmin, vmax = -10, 10
+        else:
+            if var == 'surf_temp':
+                vmin, vmax = 230, 320
+            elif var == 'precip':
+                vmin, vmax = 0, 25
+            elif var == 'icedepth':
+                vmin, vmax = 0, 3
+            elif var == 'snow':
+                vmin, vmax = 0, 3
+            elif var == 'field1389':
+                vmin, vmax = -2e-8, 10e-8
+            elif var in ('low_cloud', 'med_cloud', 'high_cloud'):
+                vmin, vmax = 0, 1
+
+        if pargs.vmin:
+            vmin = pargs.vmin
+        if pargs.vmax:
+            vmax = pargs.vmax
+
+        if vmin == None:
+            vmin = data.min()
+        if vmax == None:
+            vmax = data.max()
+
+        rolls = {
+                'djf':1,
+                'son':4,
+                'jja':7,
+                'jjas':7,
+                'mam':10}
+        num_months = {
+                'djf':3,
+                'son':3,
+                'jja':3,
+                'jjas':4,
+                'mam':3}
+
+        plt.set_cmap('RdBu_r')
+        #plt.set_cmap('RdYlGn_r')
+
+        if pargs.average:
+            if pargs.months:
+                roll = rolls[pargs.months]
+                nm = num_months[pargs.months]
+                if vec_var:
+                    data_x = np.roll(reg_data[scen]['%s_u'%var], roll, axis=0)[:nm, :, :].mean(axis=0)
+                    data_y = np.roll(reg_data[scen]['%s_v'%var], roll, axis=0)[:nm, :, :].mean(axis=0)
                     av_diff = 'average'
-                    data = reg_data[scen][var][MONTHS[month] - 1]
                 else:
-                    av_diff = 'diff (%s - ctrl)'%(scen)
-                    data = diff[MONTHS[month] - 1]
+                    if not pargs.plot_diff:
+                        av_diff = 'average'
+                        data = np.roll(reg_data[scen][var], roll, axis=0)[:nm, :, :].mean(axis=0)
+                    else:
+                        av_diff = 'diff (%s - ctrl)'%(scen)
+                        data = np.roll(diff, roll, axis=0)[:nm, :, :].mean(axis=0)
 
-            if not pargs.plot_diff:
-                vmin, vmax = None, None
-            if pargs.plot_diff:
-                if var == 'surf_temp':
-                    vmin, vmax = 0, 10
-                elif var == 'precip':
-                    vmin, vmax = -10, 10
             else:
-                if var == 'surf_temp':
-                    vmin, vmax = 230, 320
-                elif var == 'precip':
-                    vmin, vmax = 0, 25
-                elif var == 'icedepth':
-                    vmin, vmax = 0, 3
-                elif var == 'snow':
-                    vmin, vmax = 0, 3
-                elif var == 'field1389':
-                    vmin, vmax = -2e-8, 10e-8
-                elif var in ('low_cloud', 'med_cloud', 'high_cloud'):
-                    vmin, vmax = 0, 1
-
-            if pargs.vmin:
-                vmin = pargs.vmin
-            if pargs.vmax:
-                vmax = pargs.vmax
-
-            if vmin == None:
-                vmin = data.min()
-            if vmax == None:
-                vmax = data.max()
-
+                if vec_var:
+                    data_x = reg_data[scen]['%s_u'%var].mean(axis=0)
+                    data_y = reg_data[scen]['%s_v'%var].mean(axis=0)
+                    av_diff = 'average'
+                else:
+                    if not pargs.plot_diff:
+                        av_diff = 'average'
+                        data = reg_data[scen][var].mean(axis=0)
+                    else:
+                        av_diff = 'diff (%s - ctrl)'%(scen)
+                        data = diff.mean(axis=0)
 
             plt.clf()
+
             if vec_var:
                 if pargs.plot_global:
-                    plt.title('%s Global %s %s for %s'%(scen, month, av_diff, var))
+                    plt.title('%s Global %s %s for %s'%(scen, pargs.months, av_diff, var))
                     plotting.vec_general_plot(ds['ctrl'], data_x, data_y)
                 elif pargs.plot_polar:
-                    plt.title('%s SA %s %s for %s'%(scen, month, av_diff, var))
+                    plt.title('%s SA %s %s for %s'%(scen, pargs.months, av_diff, var))
                     plotting.vec_general_plot(ds['ctrl'], data_x, data_y, pargs.plot_polar)
                 elif pargs.plot_local:
-                    plt.title('%s SA %s %s for %s'%(scen, month, av_diff, var))
-                    sa_mask = create_sa_mask(ds)
-                    plotting.vec_general_plot(ds['ctrl'], data_x, data_y, 'sa', sa_mask)
+                    plt.title('%s SA %s %s for %s'%(scen, pargs.months, av_diff, var))
+                    #sa_mask = create_sa_mask(ds)
+                    plotting.vec_general_plot(ds['ctrl'], data_x, data_y, 'sa', None)
             else:
                 if pargs.plot_global:
-                    plt.title('%s Global %s %s for %s'%(scen, month, av_diff, var))
+                    plt.title('%s Global %s %s for %s'%(scen, pargs.months, av_diff, var))
                     #plt.imshow(data, interpolation='nearest', vmin=vmin, vmax=vmax)
                     plotting.general_plot(ds['ctrl'], data, vmin, vmax)
                 elif pargs.plot_polar:
-                    plt.title('%s SA %s %s for %s'%(scen, month, av_diff, var))
+                    plt.title('%s SA %s %s for %s'%(scen, pargs.months, av_diff, var))
                     plotting.general_plot(ds['ctrl'], data, vmin, vmax, pargs.plot_polar)
                 elif pargs.plot_local:
-                    plt.title('%s SA %s %s for %s'%(scen, month, av_diff, var))
-                    sa_mask = create_sa_mask(ds)
-                    plotting.general_plot(ds['ctrl'], data, vmin, vmax, 'sa', sa_mask)
+                    plt.title('%s SA %s %s for %s'%(scen, pargs.months, av_diff, var))
+                    #sa_mask = create_sa_mask(ds)
+                    plotting.general_plot(ds['ctrl'], data, vmin, vmax, 'sa', None)
+        else:
+            for month in MONTHS.keys():
+                if month == '':
+                    continue
+                if vec_var:
+                    data_x = reg_data[scen]['%s_u'%var][MONTHS[month] - 1]
+                    data_y = reg_data[scen]['%s_v'%var][MONTHS[month] - 1]
+                    av_diff = 'average'
+                else:
+                    if not pargs.plot_diff:
+                        av_diff = 'average'
+                        data = reg_data[scen][var][MONTHS[month] - 1]
+                    else:
+                        av_diff = 'diff (%s - ctrl)'%(scen)
+                        data = diff[MONTHS[month] - 1]
 
-            plt.pause(float(pargs.sleep))
+                plt.clf()
+                if vec_var:
+                    if pargs.plot_global:
+                        plt.title('%s Global %s %s for %s'%(scen, month, av_diff, var))
+                        plotting.vec_general_plot(ds['ctrl'], data_x, data_y)
+                    elif pargs.plot_polar:
+                        plt.title('%s SA %s %s for %s'%(scen, month, av_diff, var))
+                        plotting.vec_general_plot(ds['ctrl'], data_x, data_y, pargs.plot_polar)
+                    elif pargs.plot_local:
+                        plt.title('%s SA %s %s for %s'%(scen, month, av_diff, var))
+                        sa_mask = create_sa_mask(ds)
+                        plotting.vec_general_plot(ds['ctrl'], data_x, data_y, 'sa', sa_mask)
+                else:
+                    if pargs.plot_global:
+                        plt.title('%s Global %s %s for %s'%(scen, month, av_diff, var))
+                        #plt.imshow(data, interpolation='nearest', vmin=vmin, vmax=vmax)
+                        plotting.general_plot(ds['ctrl'], data, vmin, vmax)
+                    elif pargs.plot_polar:
+                        plt.title('%s SA %s %s for %s'%(scen, month, av_diff, var))
+                        plotting.general_plot(ds['ctrl'], data, vmin, vmax, pargs.plot_polar)
+                    elif pargs.plot_local:
+                        plt.title('%s SA %s %s for %s'%(scen, month, av_diff, var))
+                        sa_mask = create_sa_mask(ds)
+                        plotting.general_plot(ds['ctrl'], data, vmin, vmax, 'sa', sa_mask)
+
+                plt.pause(float(pargs.sleep))
 
 
     plt.close()
