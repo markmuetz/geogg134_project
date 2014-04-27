@@ -481,6 +481,11 @@ def primary_analysis(args):
     # Work out some differences.
     st_diffs['2co2'] = sts['2co2'] - sts['ctrl']
     st_diffs['1pct'] = sts['1pct'] - sts['ctrl']
+    sa_mask = create_sa_mask(ds)
+    #import ipdb; ipdb.set_trace()
+    sa_st_diff = np.ma.array(st_diffs['1pct'], mask=sa_mask)
+    masked_edge_aw = np.ma.array(edge_aw, mask=sa_mask)
+    sa_tcr = weighted_average(sa_st_diff, masked_edge_aw)
 
     tcr = weighted_average(st_diffs['1pct'], edge_aw)
 
@@ -494,7 +499,6 @@ def primary_analysis(args):
     # Plot on nice overlays. Note this WILL NOT work on UCL computers.
     if args.plot_local or args.plot_global:
         from plotting import plot_all
-        sa_mask = create_sa_mask(ds)
         plot_all(ds['ctrl'], st_diffs['1pct'], toa_net_flux['2co2'], sa_mask, args)
 
     res = {'ds': ds,
@@ -504,6 +508,7 @@ def primary_analysis(args):
            'toa_gm': toa_gm,
            'st_diffs': st_diffs,
            'tcr': tcr,
+           'sa_tcr': sa_tcr,
            'G': G,
            'alpha': alpha,
            'clim_sens': clim_sens}
@@ -519,6 +524,7 @@ def print_res(res):
     sts = res['sts']
     st_diffs = res['st_diffs']
     tcr = res['tcr']
+    sa_tcr = res['sa_tcr']
     toa_gm = res['toa_gm']
     G = res['G']
     alpha = res['alpha']
@@ -535,10 +541,13 @@ def print_res(res):
 
     print('co2-ctrl global mean: %f'%(weighted_average(st_diffs['2co2'], edge_aw)))
     print('TCR: 1%%-ctrl global mean: %f'%(tcr))
+    print('SA TCR: 1%%-ctrl global mean: %f'%(sa_tcr))
 
     print('G_1pct: %f'%(G['1pct']))
     print('G_2co2: %f'%(G['2co2']))
     print('alpha, clim sens (CO2): %f, %f'%(alpha, clim_sens))
+
+    print('2xCO2 global annual average surface temp: %f'%(sts['2co2'].mean()))
 
 
 def raw_data_analysis(args, aavg_weight_edge):
@@ -585,15 +594,17 @@ def plot(res):
 def main(args):
     res = primary_analysis(args)
 
-    if args.raw_data:
-	res['raw'] = raw_data_analysis(args, res['edge_aw'])
+    if not args.output:
+        if args.raw_data:
+            res['raw'] = raw_data_analysis(args, res['edge_aw'])
 
-    res['all'] = {}
-    res['all']['data'], res['all']['ts_data'], res['all']['lts_data'] = get_all_data(args, res['ds'], res['edge_aw'])
-    if args.plot:
-        plot(res)
-    if args.interactive:
-        plot_interactive(res['ds'], res['all']['data'], res['all']['ts_data'], res['all']['lts_data'])
+        res['all'] = {}
+        res['all']['data'], res['all']['ts_data'], res['all']['lts_data'] = get_all_data(args, res['ds'], res['edge_aw'])
+
+        if args.plot:
+            plot(res)
+        if args.interactive:
+            plot_interactive(res['ds'], res['all']['data'], res['all']['ts_data'], res['all']['lts_data'])
 
     return res
 
