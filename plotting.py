@@ -117,7 +117,7 @@ def plot_global_figure(control_dataset, data):
     ax8.xaxis.set_major_formatter(formatter)
 
     ax9 = plt.subplot(5, 2, 8)
-    plt.title('Seasonal average precip.')
+    plt.title('Seasonal mean precip.')
     plt.plot(np.arange(0.5, 11.6, 1), precip_diff.mean(axis=(1, 2)))
     months = [calendar.month_name[i + 1][:1] for i in range(12)]
     ax9.set_xticks(np.arange(12) + 1./2)
@@ -127,7 +127,7 @@ def plot_global_figure(control_dataset, data):
     ax9.set_ylabel('$\Delta$ Precip. (mm/day)')
 
     ax10 = plt.subplot(5, 2, 10)
-    plt.title('Zonal average precip.')
+    plt.title('Zonal mean precip.')
     plt.plot(np.arange(-90, 90, 180./73.), precip_diff.mean(axis=(0, 2)))
 
     ax10.set_xticks(np.arange(-90, 91, 45))
