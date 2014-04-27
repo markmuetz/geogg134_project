@@ -577,6 +577,11 @@ def create_args():
     args = parser.parse_args()
     return args
 
+def plot(res):
+    import plotting
+    sa_mask = create_sa_mask(res['ds'])
+    plotting.plot_figures(res['ds']['ctrl'], res['all'], sa_mask)
+
 def main(args):
     res = primary_analysis(args)
 
@@ -586,9 +591,7 @@ def main(args):
     res['all'] = {}
     res['all']['data'], res['all']['ts_data'], res['all']['lts_data'] = get_all_data(args, res['ds'], res['edge_aw'])
     if args.plot:
-        import plotting
-        sa_mask = create_sa_mask(res['ds'])
-        plotting.plot_figures(res['ds']['ctrl'], res['all'], sa_mask)
+        plot(res)
     if args.interactive:
         plot_interactive(res['ds'], res['all']['data'], res['all']['ts_data'], res['all']['lts_data'])
 
